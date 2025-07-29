@@ -20,24 +20,27 @@ def build_base_selector(el):
     else:
         return el.name
 
-def generate_selectors(parent, selectors, seen):
+def generate_selectors(parent, selectors, seen, path=""):
     tag_counts = defaultdict(int)
+
     for child in parent.find_all(recursive=False):
         if not child.name:
             continue
 
-        base_selector = build_base_selector(child)
-        tag_counts[base_selector] += 1
-        count = tag_counts[base_selector]
+        base = build_base_selector(child)
+        tag_counts[base] += 1
+        count = tag_counts[base]
 
-        if base_selector not in seen:
-            selectors.append(f"{base_selector} {{ }}")
-            seen.add(base_selector)
-
+        full_selector = base
         if count > 1:
-            selectors.append(f"{base_selector}:nth-of-type({count}) {{ }}")
+            full_selector += f":nth-of-type({count})"
 
-        generate_selectors(child, selectors, seen)
+        full_path = f"{path} {full_selector}" if path else full_selector
+
+        if full_path not in seen:
+            selectors.append(f"{full_path} {{ }}")
+            seen.add(full_path)
+        generate_selectors(child, selectors, seen, full_path)
 
 def main():
     parser = argparse.ArgumentParser(description='Generate CSS skeleton from HTML')
@@ -48,17 +51,20 @@ def main():
     input_file = args.input
     output_file = args.output
 
+    if not os.path.exists(input_file):
+        print(f"❌ Input file '{input_file}' not found.")
+        sys.exit(1)
+
     if os.path.exists(output_file):
-        response = input(f"⚠️  Warning: The output file '{output_file}' already exists. Shall I overwrite it? (yes/no): ").strip().lower()
+        response = input(f"⚠️  Output file '{output_file}' exists. Overwrite it? (yes/no): ").strip().lower()
         if response not in ['yes', 'y']:
-            print("⛔ Operation cancelled. No file was overwritten.")
+            print("⛔ Operation cancelled.")
             sys.exit(0)
 
     with open(input_file, "r", encoding="utf-8") as f:
         html = f.read()
 
     soup = BeautifulSoup(html, "html.parser")
-
     has_css = any(
         link.get("href", "").endswith(".css")
         for link in soup.find_all("link", rel="stylesheet")
@@ -71,7 +77,10 @@ def main():
         else:
             new_head = soup.new_tag("head")
             new_head.append(link_tag)
-            soup.html.insert(0, new_head)
+            if soup.html:
+                soup.html.insert(0, new_head)
+            else:
+                soup.insert(0, new_head)
 
     with open(input_file, "w", encoding="utf-8") as f:
         f.write(str(soup))
@@ -82,19 +91,19 @@ html {}
 body {}
 
 @media screen and (max-width: 600px) {
-    /* Styles for phones */
+  /* Styles for phones */
 }
 
 @media screen and (min-width: 601px) and (max-width: 768px) {
-    /* Styles for tablets */
+  /* Styles for tablets */
 }
 
 @media screen and (min-width: 769px) and (max-width: 1024px) {
-    /* Styles for small laptops/desktops */
+  /* Styles for small laptops/desktops */
 }
 
 @media screen and (min-width: 1025px) {
-    /* Styles for large desktops */
+  /* Styles for large desktops */
 }
 
 """)
@@ -107,6 +116,7 @@ body {}
         for line in selectors:
             outfile.write(line + "\n\n")
 
+    print(f"✅ CSS skeleton successfully generated at: {output_file}")
 
 if __name__ == "__main__":
     main()
