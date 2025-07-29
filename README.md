@@ -15,6 +15,8 @@
 
 ## 📦 Install (Recommended via PyPI)
 
+Install globally using pip from [PyPI](https://pypi.org/project/html2css/):
+
 Install globally via pip:
 
 ```bash
